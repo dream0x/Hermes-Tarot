@@ -107,12 +107,15 @@ EOF
 systemctl daemon-reload
 systemctl enable hermes-tarot.service > /dev/null
 
-# Pre-create runtime dirs as service user
+# Pre-create runtime dirs as service user.
+# .solcx must exist before the service starts because systemd ReadWritePaths
+# fails to mount a non-existent directory.
 sudo -u "$SERVICE_USER" mkdir -p \
   "$INSTALL_DIR/data" \
   "$INSTALL_DIR/logs" \
   "$INSTALL_DIR/tarot/cache" \
-  "$INSTALL_DIR/nft/build"
+  "$INSTALL_DIR/nft/build" \
+  "$INSTALL_DIR/.solcx"
 
 cat <<EOF
 
