@@ -41,7 +41,7 @@ from telegram.ext import (
 import oracle as oracle_mod
 from config import cfg
 from memory import Profile, Reading, append_reading, find_reading, recent_readings
-from ratelimit import can_mint, check_can_read, commit_read, todays_spend
+from ratelimit import can_mint, check_can_read, commit_mint, commit_read, todays_spend
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
@@ -192,15 +192,15 @@ def _owner_default_wallet() -> str:
 
 
 def _reading_keyboard(user_id: int, reading_id: str) -> InlineKeyboardMarkup:
-    rows: list[list[InlineKeyboardButton]] = []
-    if cfg.is_owner(user_id):
-        rows.append([InlineKeyboardButton("🔮 Mint hero card on-chain",
-                                          callback_data=f"mint:{reading_id}:0")])
-    rows.append([
-        InlineKeyboardButton("🪞 Pull again", callback_data="pull_again"),
-        InlineKeyboardButton("📅 Daily at 9 AM UTC", callback_data="schedule_daily"),
+    """Mint is now public — gated by per-user lifetime quota in ratelimit.can_mint()."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔮 Mint hero card on-chain",
+                              callback_data=f"mint:{reading_id}:0")],
+        [
+            InlineKeyboardButton("🪞 Pull again", callback_data="pull_again"),
+            InlineKeyboardButton("📅 Daily at 9 AM UTC", callback_data="schedule_daily"),
+        ],
     ])
-    return InlineKeyboardMarkup(rows)
 
 
 def _signs_inline_keyboard(prefix: str) -> InlineKeyboardMarkup:
@@ -226,13 +226,15 @@ def _cities_inline_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
-def _wallet_keyboard() -> InlineKeyboardMarkup:
+def _wallet_keyboard(*, owner: bool = False) -> InlineKeyboardMarkup:
+    """Wallet pick keyboard. Owner sees a 'use server wallet' shortcut."""
     rows: list[list[InlineKeyboardButton]] = []
-    default = _owner_default_wallet()
-    if default:
-        rows.append([InlineKeyboardButton(
-            f"🤖 Use server wallet ({default[:6]}…{default[-4:]})",
-            callback_data="onb:wallet:_default")])
+    if owner:
+        default = _owner_default_wallet()
+        if default:
+            rows.append([InlineKeyboardButton(
+                f"🤖 Use server wallet ({default[:6]}…{default[-4:]})",
+                callback_data="onb:wallet:_default")])
     rows.append([InlineKeyboardButton("✏️  Paste my own wallet (0x…)",
                                       callback_data="onb:wallet:_custom")])
     rows.append([InlineKeyboardButton("⏭  Skip for now", callback_data="onb:wallet:_skip")])
@@ -320,17 +322,15 @@ async def onb_city_custom(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
 
 async def _onb_next_after_city(update: Update, ctx: ContextTypes.DEFAULT_TYPE, user_id: int) -> int:
     chat_id = update.effective_chat.id
-    if cfg.is_owner(user_id):
-        await ctx.bot.send_message(
-            chat_id,
-            "*Step 3 of 3 (owner only).* Which wallet should receive minted NFT cards?",
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=_wallet_keyboard(),
-        )
-        return ONB_WALLET
-    await ctx.bot.send_message(chat_id, _onb_done_text(user_id),
-                                parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
-    return ConversationHandler.END
+    is_owner = cfg.is_owner(user_id)
+    msg = ("*Step 3 of 3.* Which wallet should receive your minted NFT cards?\n\n"
+           "_You can mint one card on Base Sepolia (free testnet). Paste your wallet "
+           "or skip — you can always set it later with `/profile wallet 0x…`._")
+    await ctx.bot.send_message(
+        chat_id, msg, parse_mode=ParseMode.MARKDOWN,
+        reply_markup=_wallet_keyboard(owner=is_owner),
+    )
+    return ONB_WALLET
 
 
 async def onb_pick_wallet(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
@@ -391,6 +391,8 @@ def _onb_done_text(user_id: int) -> str:
 
 
 async def onb_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
+    # Also clear any pending wallet-for-mint state.
+    ctx.user_data.pop("pending_mint", None)
     await update.message.reply_text(
         "Cancelled. Tap a button or type /start to begin again.",
         reply_markup=MAIN_KB,
@@ -679,13 +681,65 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def on_free_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """A user message NOT inside any conversation and NOT matching a button.
-    Treat it as a question for a 3-card spread (the original UX)."""
+    Two cases:
+      1) A pending mint is awaiting the user's wallet — accept it and mint.
+      2) Otherwise treat the text as a tarot question (3-card spread)."""
     if not update.message or not update.message.text:
         return
     q = update.message.text.strip()
     if q.startswith("/"):
         return
+
+    pending = ctx.user_data.get("pending_mint")
+    if pending:
+        # User pasted a wallet (we hope) for the awaiting mint.
+        if not (q.startswith("0x") and len(q) == 42):
+            await update.message.reply_text(
+                "That doesn't look like a wallet address. Paste a `0x…` address (42 chars), "
+                "or /cancel to abort.",
+                parse_mode=ParseMode.MARKDOWN)
+            return
+        user_id = _user_id(update)
+        profile = Profile.load(user_id)
+        profile.wallet_address = q
+        profile.save()
+        ctx.user_data.pop("pending_mint", None)
+        await update.message.reply_text(f"🪙 Wallet saved: `{q}`", parse_mode=ParseMode.MARKDOWN)
+        await _do_mint(ctx, update.effective_chat.id, user_id,
+                       pending["reading_id"], pending["card_index"])
+        return
+
     await _do_reading(update, ctx, q, spread="three_card")
+
+
+async def _do_mint(ctx: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int,
+                   reading_id: str, card_index: int) -> None:
+    """Run the mint pipeline and surface the result. Public + owner share this path."""
+    await ctx.bot.send_message(chat_id,
+        "⛓️ _Pinning to IPFS and minting on Base Sepolia (≈ 10 s)..._",
+        parse_mode=ParseMode.MARKDOWN)
+    try:
+        result = await asyncio.to_thread(oracle_mod.mint_card, user_id, reading_id, card_index)
+    except Exception as e:  # noqa: BLE001
+        log.exception("mint failed")
+        await ctx.bot.send_message(chat_id, f"Mint failed: `{e}`",
+                                    parse_mode=ParseMode.MARKDOWN)
+        return
+
+    commit_mint(user_id)
+
+    reading = find_reading(user_id, reading_id)
+    card_name = reading.cards[card_index]["name"] if reading and reading.cards else "card"
+
+    await ctx.bot.send_message(
+        chat_id,
+        f"✨ *Minted on Base Sepolia.*\n"
+        f"*{card_name}* → token #{result['token_id']}\n\n"
+        f"🃏 [View your card]({result['viewer_url']})\n"
+        f"🔗 [Basescan token]({result['basescan_token_url']}) · [Tx]({result['tx_url']})",
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=False,
+    )
 
 
 # ----------------------------------------------------------------------
@@ -772,37 +826,19 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
         profile = Profile.load(user_id)
         if not profile.wallet_address:
-            default = _owner_default_wallet()
-            if default:
-                profile.wallet_address = default
-                profile.save()
-                await ctx.bot.send_message(query.message.chat_id,
-                    f"_(no wallet set; using server wallet `{default[:6]}…{default[-4:]}` — change with `/profile wallet 0x…`)_",
-                    parse_mode=ParseMode.MARKDOWN)
-
-        await ctx.bot.send_message(query.message.chat_id,
-            "⛓️ _Pinning to IPFS and minting on Base Sepolia (≈ 10 s)..._",
-            parse_mode=ParseMode.MARKDOWN)
-        try:
-            result = await asyncio.to_thread(oracle_mod.mint_card, user_id, reading_id, int(idx))
-        except Exception as e:  # noqa: BLE001
-            log.exception("mint failed")
-            await ctx.bot.send_message(query.message.chat_id, f"Mint failed: `{e}`",
-                                        parse_mode=ParseMode.MARKDOWN)
+            # Stash the pending mint so the next text message routes here.
+            ctx.user_data["pending_mint"] = {"reading_id": reading_id, "card_index": int(idx)}
+            await ctx.bot.send_message(query.message.chat_id,
+                "🪙 *No wallet on file yet.*\n\n"
+                "Paste a Base Sepolia (or any EVM) wallet address and I'll mint the card to it. "
+                "Must start with `0x` and be 42 characters.\n\n"
+                "_Don't have one? Create a fresh wallet in MetaMask, copy its address, paste here. "
+                "No funds needed for the mint — we cover the testnet gas._\n\n"
+                "Or send /cancel to abort.",
+                parse_mode=ParseMode.MARKDOWN)
             return
 
-        reading = find_reading(user_id, reading_id)
-        card_name = reading.cards[int(idx)]["name"] if reading and reading.cards else "card"
-
-        await ctx.bot.send_message(
-            query.message.chat_id,
-            f"✨ *Minted on Base Sepolia.*\n"
-            f"*{card_name}* → token #{result['token_id']}\n\n"
-            f"🃏 [View your card]({result['viewer_url']})\n"
-            f"🔗 [Basescan token]({result['basescan_token_url']}) · [Tx]({result['tx_url']})",
-            parse_mode=ParseMode.MARKDOWN,
-            disable_web_page_preview=False,
-        )
+        await _do_mint(ctx, query.message.chat_id, user_id, reading_id, int(idx))
 
 
 # ----------------------------------------------------------------------
@@ -830,6 +866,21 @@ async def _job_daily_horoscope(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # Wiring
 # ----------------------------------------------------------------------
 
+async def _on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Global error handler: log + tell the user something failed instead of going silent."""
+    log.exception("Unhandled error", exc_info=ctx.error)
+    try:
+        chat = getattr(update, "effective_chat", None)
+        if chat:
+            await ctx.bot.send_message(
+                chat_id=chat.id,
+                text=f"_Something stumbled internally. The dev was notified._\n`{type(ctx.error).__name__}: {ctx.error}`",
+                parse_mode=ParseMode.MARKDOWN,
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+
 async def _post_init(app: Application) -> None:
     try:
         await app.bot.set_my_commands(COMMANDS_MENU, scope=BotCommandScopeAllPrivateChats())
@@ -852,6 +903,7 @@ def build_app() -> Application:
     if not cfg.telegram_bot_token:
         raise SystemExit("TELEGRAM_BOT_TOKEN is not set")
     app = ApplicationBuilder().token(cfg.telegram_bot_token).post_init(_post_init).build()
+    app.add_error_handler(_on_error)
 
     # 1) Onboarding — only fires for first-time /start
     onboarding = ConversationHandler(

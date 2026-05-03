@@ -32,6 +32,7 @@ class Quota:
     day_count: int = 0          # readings used today
     lifetime_count: int = 0     # readings used ever
     last_seen: float = 0.0
+    mint_lifetime: int = 0      # NFT mints used ever (anti-abuse)
 
 
 def _today_utc() -> str:
@@ -168,11 +169,35 @@ def commit_read(user_id: int | str) -> Quota:
 
 
 def can_mint(user_id: int | str) -> Decision:
-    """Mint is owner-only. (Trivial wrapper but kept here so callers are uniform.)"""
-    if cfg.is_owner(user_id):
-        return Decision(True, "owner", "owner_only")
-    return Decision(False, "public", "owner_only_mint",
-                    "🔒 Minting is currently owner-only. Public mint coming in v0.2.")
+    """Mint policy:
+      - owner       : unlimited mints
+      - allowlist   : MINT_LIFETIME_ALLOWLIST mints lifetime
+      - public      : MINT_LIFETIME_PUBLIC mints lifetime (default 1, anti-abuse)
+    Spend ceiling still applies globally for non-owner mints (gas + Pinata bandwidth)."""
+    tier: Tier = cfg.tier_of(user_id)  # type: ignore[assignment]
+    if tier == "owner":
+        return Decision(True, tier, "owner_unlimited")
+
+    # Global $ ceiling
+    g = todays_spend()
+    if g.spent_usd >= cfg.max_daily_usd_spend:
+        return Decision(False, tier, "spend_ceiling",
+                        "🕯️ Today's quota is spent. The forge cools at midnight UTC.")
+
+    q = load_quota(user_id)
+    limit = cfg.mint_lifetime_allowlist if tier == "allowlist" else cfg.mint_lifetime_public
+    if q.mint_lifetime >= limit:
+        return Decision(False, tier, "mint_lifetime",
+                        f"🪙 You've already minted your {limit} keepsake card(s). "
+                        f"DM the dev for more.")
+    return Decision(True, tier, "ok")
+
+
+def commit_mint(user_id: int | str) -> Quota:
+    q = load_quota(user_id)
+    q.mint_lifetime += 1
+    save_quota(q)
+    return q
 
 
 # ----- CLI for ops -----

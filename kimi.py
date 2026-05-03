@@ -84,10 +84,19 @@ blocked, or just-beginning. Acknowledge the inversion naturally as part of
 your answer; never say "the card is reversed".
 
 # What you never say
-- "I sense", "I see", "the cards say" — speak *from* the cards, not *about* them.
+- "I sense", "I see", "the cards say". Speak from the cards, not about them.
 - "It depends", "trust your gut", "everything happens for a reason".
 - Astrological jargon dumps. Never list more than two planets per reading.
 - Generic card-meaning recitation that doesn't connect to the question.
+
+# Punctuation discipline
+- **Never use em-dashes (—) or en-dashes (–).** They are forbidden.
+- Use commas, semicolons, colons, parentheses, or new sentences instead.
+  Examples of how to rewrite:
+    "the lamp — held low — was steady" -> "the lamp, held low, was steady"
+    "yes, but not as a leap — set a date" -> "yes, but not as a leap. Set a date"
+    "the field is calmer — water is downstream" -> "the field is calmer; water is downstream"
+- Hyphens inside words (e.g. "long-horizon", "sun-sign") are fine.
 """
 
 
@@ -107,15 +116,15 @@ Past readings: (none yet)
 """
 
 _FEWSHOT_THREE_CARD_ASSISTANT = """\
-This is a question about readiness, not courage. You are not asking whether you can — you are asking whether the ground is firm enough to step onto.
+This is a question about readiness, not courage. You are not asking whether you can. You are asking whether the ground is firm enough to step onto.
 
-Behind you, the Hermit. Long evenings of asking the question only you could ask, lamp held low to the ground. That solitude wasn't avoidance — it was the research that earned you the right to ask this now. You already know more than you think you know.
+Behind you, the Hermit. Long evenings of asking the question only you could ask, lamp held low to the ground. That solitude wasn't avoidance; it was the research that earned you the right to ask this now. You already know more than you think you know.
 
-The Eight of Pentacles is where you stand. The thousandth iteration of the small hammer. Whatever you are already building in your stolen hours is the thing. The skill is real, the rhythm is real, and the proof is already in the room with you. You are not at the start of this — you are mid-craft.
+The Eight of Pentacles is where you stand. The thousandth iteration of the small hammer. Whatever you are already building in your stolen hours is the thing. The skill is real, the rhythm is real, and the proof is already in the room with you. You are not at the start of this; you are mid-craft.
 
-Ahead, the Star opens. Not luck, not rescue — permission. After the lamp and after the bench, the air clears and you can pour from two cups again. The relief you are imagining is honest; it is not a fantasy.
+Ahead, the Star opens. Not luck, not rescue. Permission. After the lamp and after the bench, the air clears and you can pour from two cups again. The relief you are imagining is honest; it is not a fantasy.
 
-So: yes, but not as a leap. Set a date that comes after one more concrete proof — a customer, a contract, a finished version of the small thing. Leave when the bench is yours, not when the bench is finished. Until then, breathe slower.
+So: yes, but not as a leap. Set a date that comes after one more concrete proof, a customer or a contract or a finished version of the small thing. Leave when the bench is yours, not when the bench is finished. Until then, breathe slower.
 
 *For reflection, not prescription.*
 """
@@ -146,6 +155,31 @@ def _record(usage: Any) -> None:
         record_spend(cost, "kimi")
 
 
+_DASH_CHARS = "—–―"  # em-dash, en-dash, horizontal-bar
+
+
+def _strip_dashes(text: str) -> str:
+    """Belt-and-suspenders: even if the model slips an em-dash through, kill it.
+    Em/en dashes between words become commas; standalone become periods."""
+    out = []
+    for i, ch in enumerate(text):
+        if ch in _DASH_CHARS:
+            # If surrounded by spaces, it's a sentence-style dash. Replace with comma.
+            prev_sp = i > 0 and text[i - 1] == " "
+            next_sp = i + 1 < len(text) and text[i + 1] == " "
+            if prev_sp and next_sp:
+                # Replace " — " with ", " (eat the leading space).
+                if out and out[-1] == " ":
+                    out.pop()
+                out.append(",")
+            else:
+                # Hyphenated word like "long—horizon"; safest swap is hyphen.
+                out.append("-")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def _chat(messages: list[dict[str, str]], *, max_tokens: int = 1200, retries: int = 2) -> str:
     """Single non-streaming Kimi call. Disables `thinking` mode (slow + we don't need
     chain-of-thought in user-facing output)."""
@@ -164,7 +198,7 @@ def _chat(messages: list[dict[str, str]], *, max_tokens: int = 1200, retries: in
             _record(getattr(resp, "usage", None))
             if not text:
                 raise RuntimeError("empty content from kimi")
-            return text
+            return _strip_dashes(text)
         except Exception as e:  # noqa: BLE001
             last_err = e
             logger.warning("kimi attempt %d failed: %s", attempt + 1, e)

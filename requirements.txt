@@ -19,8 +19,10 @@ py-solc-x>=2.0.0
 # Config
 python-dotenv>=1.0.0
 
-# Telegram (used only if we run a standalone bot — Hermes has its own backend)
-python-telegram-bot>=21.0
+# Telegram (used only if we run a standalone bot — Hermes has its own backend).
+# The [job-queue] extra is REQUIRED for the daily-horoscope cron button.
+# Without it, ctx.job_queue is None and tapping "Daily at 9 AM UTC" raises silently.
+python-telegram-bot[job-queue]>=21.0
 
 # Astro calc (lightweight; pyswisseph is heavier, skyfield is pure-python)
 skyfield>=1.49

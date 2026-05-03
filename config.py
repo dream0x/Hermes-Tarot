@@ -66,6 +66,8 @@ class Config:
     public_daily_readings: int = field(default_factory=lambda: _int("PUBLIC_DAILY_READINGS", 3))
     public_lifetime_readings: int = field(default_factory=lambda: _int("PUBLIC_LIFETIME_READINGS", 10))
     allowlist_daily_readings: int = field(default_factory=lambda: _int("ALLOWLIST_DAILY_READINGS", 20))
+    mint_lifetime_public: int = field(default_factory=lambda: _int("MINT_LIFETIME_PUBLIC", 1))
+    mint_lifetime_allowlist: int = field(default_factory=lambda: _int("MINT_LIFETIME_ALLOWLIST", 5))
     max_daily_usd_spend: float = field(default_factory=lambda: _float("MAX_DAILY_USD_SPEND", 5.0))
     public_enabled: bool = field(default_factory=lambda: _bool("PUBLIC_ENABLED", True))
 

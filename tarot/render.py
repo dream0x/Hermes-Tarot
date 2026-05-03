@@ -118,10 +118,9 @@ def _overlay_title(path: Path, card_name: str, reversed_: bool = False) -> None:
     inner = (rect[0] + 4, rect[1] + 4, rect[2] - 4, rect[3] - 4)
     draw.rectangle(inner, outline=gold, width=1)
 
-    # Title text — fit to band
+    # Title text — fit to band. Reversed indicator is the 180° rotation
+    # applied later, not text decoration (which would itself flip).
     title = card_name.upper()
-    if reversed_:
-        title = f"{title}  ⤓"
     inner_w = inner[2] - inner[0] - 24
     inner_h = inner[3] - inner[1] - 12
     # Binary-search the largest font size that fits horizontally + vertically
@@ -193,6 +192,13 @@ def render_card(
     # Always overlay the *correct* card name; FLUX's title cartouche is wrong.
     card = deck_mod.by_id(card_id)
     _overlay_title(cache, card.name, reversed_=reversed_)
+    # For reversed cards, rotate the entire composed image 180° — that's how a
+    # real reversed tarot card looks: the artwork upside down, the title cartouche
+    # at the top when held normally. The reader recognises it instantly.
+    if reversed_:
+        from PIL import Image as _PI
+        im = _PI.open(cache).convert("RGB").rotate(180, expand=False)
+        im.save(cache, format="PNG", optimize=True)
     record_spend(COST_PER_IMAGE_USD, "fal")
     return cache
 
