@@ -1,9 +1,9 @@
-"""IPFS pin + ERC-721 mint pipeline for Hermes Oracle.
+"""IPFS pin + ERC-721 mint pipeline for Mnemos.
 
 Two entrypoints:
-  - `compile_and_deploy()` — one-shot deploy of OracleCard to Base Sepolia.
+  - `compile_and_deploy()` - one-shot deploy of OracleCard to Base Sepolia.
     Writes the address into .env. Run once.
-  - `mint_oracle_card(...)` — pin image + metadata to Pinata, then call
+  - `mint_oracle_card(...)` - pin image + metadata to Pinata, then call
     safeMint on the deployed contract. Called by oracle.py.
 
 CLI:
@@ -39,7 +39,7 @@ ARTIFACT = BUILD_DIR / "OracleCard.json"
 
 CHAIN_ID = 84532  # Base Sepolia
 COST_PIN_USD = 0.0     # Pinata free tier, treat as zero
-COST_GAS_USD_EST = 0.0 # testnet, no real $ — track 0 by default
+COST_GAS_USD_EST = 0.0 # testnet, no real $ - track 0 by default
 
 PINATA_BASE = "https://api.pinata.cloud"
 PINATA_GATEWAY = "https://gateway.pinata.cloud/ipfs/"
@@ -136,7 +136,7 @@ def compile_and_deploy() -> str:
     print(f"Etherscan: https://sepolia.basescan.org/address/{address}")
     print(f"Tx:        https://sepolia.basescan.org/tx/{res['tx_hash']}")
 
-    # Patch .env in place — keep all other lines as-is
+    # Patch .env in place - keep all other lines as-is
     env_path = Path(__file__).resolve().parent.parent / ".env"
     if env_path.exists():
         lines = env_path.read_text().splitlines()
@@ -195,7 +195,7 @@ def pin_json(data: dict[str, Any], name: str) -> str:
 def build_metadata(card: dict[str, Any], question: str, interpretation_excerpt: str,
                    reading_id: str, image_cid: str) -> dict[str, Any]:
     return {
-        "name": f"Mnemos — {card['name']}{' (Reversed)' if card.get('reversed') else ''}",
+        "name": f"Mnemos - {card['name']}{' (Reversed)' if card.get('reversed') else ''}",
         "description": (
             f"A card from a Mnemos reading. Question: \"{question}\".\n\n"
             f"{interpretation_excerpt}\n\n"
@@ -226,7 +226,7 @@ def mint_oracle_card(
 ) -> dict[str, Any]:
     """Pin image+metadata to IPFS, then safeMint on the deployed OracleCard."""
     if not cfg.oracle_card_contract or cfg.oracle_card_contract.lower() == "0x" + "0" * 40:
-        raise RuntimeError("ORACLE_CARD_CONTRACT not set — run `python -m nft.mint --deploy` first")
+        raise RuntimeError("ORACLE_CARD_CONTRACT not set - run `python -m nft.mint --deploy` first")
 
     image_path = Path(card["image_path"])
     if not image_path.exists():

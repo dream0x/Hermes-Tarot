@@ -1,23 +1,23 @@
-# Mnemos — Hackathon Submission
+# Mnemos - Hackathon Submission
 
-> Internal cheat sheet for the user. Not pushed for marketing — just keeps everything you need in one place when you record + post.
+> Internal cheat sheet for the user. Not pushed for marketing - just keeps everything you need in one place when you record + post.
 
 ## ✅ Status (live)
 
-- **Code:** https://github.com/dream0x/Mnemos — public, MIT
+- **Code:** https://github.com/dream0x/Mnemos - public, MIT
 - **Live bot:** [@mnemos_oracle_bot](https://t.me/mnemos_oracle_bot) on Telegram
-- **NFT contract (Base Sepolia):** `0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16` — [Basescan](https://sepolia.basescan.org/address/0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16)
+- **NFT contract (Base Sepolia):** `0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16` - [Basescan](https://sepolia.basescan.org/address/0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16)
 - **Custom on-chain card viewer:** https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1
 - **Hosting:** Hetzner CX22 (€4.5/mo), systemd auto-restart, ufw firewall
 
-## Demo recording — must-show beats
+## Demo recording - must-show beats
 
-In any order, but all four must appear in the 60–90s video:
+In any order, but all four must appear in the 60-90s video:
 
-1. **A reading happens** — type a question in @mnemos_oracle_bot, three FLUX cards appear as a media-group, Kimi reading scrolls below.
-2. **Memory is real** — pull a SECOND reading and show that the oracle references the first ("Last week the Fool came to you…"). This is the "Powered by Kimi K2.6 · 256K context" moment — burn that caption on screen.
-3. **Mint on-chain** — tap the `🔮 Mint` button, see the OpenSea-style custom viewer load the actual card from Base Sepolia + IPFS. (Use this URL: https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=N)
-4. **Schedule daily** — tap `📅 Daily at 9 AM UTC` to show Hermes' natural scheduling power.
+1. **A reading happens** - type a question in @mnemos_oracle_bot, three FLUX cards appear as a media-group, Kimi reading scrolls below.
+2. **Memory is real** - pull a SECOND reading and show that the oracle references the first ("Last week the Fool came to you…"). This is the "Powered by Kimi K2.6 · 256K context" moment - burn that caption on screen.
+3. **Mint on-chain** - tap the `🔮 Mint` button, see the OpenSea-style custom viewer load the actual card from Base Sepolia + IPFS. (Use this URL: https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=N)
+4. **Schedule daily** - tap `📅 Daily at 9 AM UTC` to show Hermes' natural scheduling power.
 
 **On-screen credits required:** `@NousResearch` `@Kimi_Moonshot`, plus the GitHub URL on the end card.
 
@@ -44,11 +44,11 @@ Optional but adds polish:
 
 ## 📩 Discord post (drop in `#creative-hackathon-submissions`)
 
-Two options — pick one or remix:
+Two options - pick one or remix:
 
 ### Short
 ```
-🔮 Mnemos — a tarot/astrology divination skill for Hermes Agent.
+🔮 Mnemos - a tarot/astrology divination skill for Hermes Agent.
 Pulls 3-card spreads rendered as a unified FLUX deck, interprets via Kimi K2.6
 with 256K-context memory of every prior reading, and mints the hero card on
 Base Sepolia. Live bot: @mnemos_oracle_bot.
@@ -89,12 +89,12 @@ Contract: 0xA1b9BdEB72aA4F4B86C11234ea6301DaA68D2C16 (Base Sepolia)
 
 ## 🧹 Post-hackathon cleanup checklist
 
-When judging is over (don't forget — chat already exposed these):
+When judging is over (don't forget - chat already exposed these):
 
 - [ ] Rotate `KIMI_API_KEY` (platform.kimi.ai → API Keys → Revoke + Create new)
 - [ ] Rotate `FAL_KEY` (fal.ai/dashboard/keys)
 - [ ] Rotate `PINATA_JWT` (app.pinata.cloud → API Keys)
 - [ ] Revoke Telegram bot token via @BotFather → `/revoke` (or just stop the service if you want to keep the bot for fun)
-- [ ] Drain & abandon the Base Sepolia wallet (`0x293e3ADa1dF0E3a09Dd332E0a29476cc322c2919`) — testnet only so impact is zero, but rotate hygiene
+- [ ] Drain & abandon the Base Sepolia wallet (`0x293e3ADa1dF0E3a09Dd332E0a29476cc322c2919`) - testnet only so impact is zero, but rotate hygiene
 - [ ] Optionally `hcloud server delete <id>` to retire the Hetzner box (or keep for €4.5/mo if the bot is fun)
 - [ ] Update README to add a "live bot offline" note if you take the bot down

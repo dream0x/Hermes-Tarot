@@ -13,8 +13,11 @@ under ~/.hermes/; we don't touch it directly.
 """
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass, asdict, field
@@ -23,11 +26,36 @@ from typing import Any, Iterable
 
 DATA_ROOT = Path(os.environ.get("ORACLE_DATA_ROOT", Path(__file__).parent / "data"))
 
+# Allow only digits (Telegram user_id) plus a leading dash for negative test ids.
+# Blocks path traversal via SDK callers passing "../../etc" as user_id.
+_VALID_USER_ID = re.compile(r"^-?\d+$|^test_[a-zA-Z0-9_]+$")
+
 
 def _user_dir(user_id: int | str) -> Path:
-    p = DATA_ROOT / str(user_id)
+    s = str(user_id)
+    if not _VALID_USER_ID.match(s):
+        raise ValueError(f"refusing path-unsafe user_id: {s!r}")
+    p = DATA_ROOT / s
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+@contextlib.contextmanager
+def file_lock(path: Path):
+    """Cross-process advisory lock on a sibling .lock file. Use around any
+    read-modify-write (e.g. quota.json, readings.jsonl rewrites, global_spend.json).
+    """
+    lock_path = path.with_suffix(path.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        finally:
+            os.close(fd)
 
 
 # ---------- Profile ----------
@@ -81,7 +109,7 @@ class Reading:
 
 def append_reading(reading: Reading) -> None:
     path = _user_dir(reading.user_id) / "readings.jsonl"
-    with path.open("a", encoding="utf-8") as f:
+    with file_lock(path), path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(asdict(reading), ensure_ascii=False) + "\n")
 
 
@@ -110,21 +138,23 @@ def find_reading(user_id: int | str, reading_id: str) -> Reading | None:
 
 
 def update_reading(user_id: int | str, reading_id: str, **fields: Any) -> Reading | None:
-    """Rewrite the JSONL with one reading patched. Hot path is rare (mint flow)."""
+    """Rewrite the JSONL with one reading patched. Hot path is rare (mint flow).
+    Locked to prevent losing concurrent appends."""
     path = _user_dir(user_id) / "readings.jsonl"
     if not path.exists():
         return None
-    rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
-    found: Reading | None = None
-    for row in rows:
-        if row["id"] == reading_id:
-            row.update(fields)
-            found = Reading(**row)
-            break
-    if found is None:
-        return None
-    path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n")
-    return found
+    with file_lock(path):
+        rows = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        found: Reading | None = None
+        for row in rows:
+            if row["id"] == reading_id:
+                row.update(fields)
+                found = Reading(**row)
+                break
+        if found is None:
+            return None
+        path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n")
+        return found
 
 
 # ---------- Predictions (optional, for "did it come true?") ----------

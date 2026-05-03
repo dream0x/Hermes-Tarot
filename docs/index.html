@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Mnemos — On-chain Card Viewer</title>
+<title>Mnemos - On-chain Card Viewer</title>
 <meta name="description" content="View a Mnemos tarot card minted on Base Sepolia. Mnemos is a Hermes Agent skill powered by Kimi K2.6." />
-<meta property="og:title" content="Mnemos — On-chain Card" />
+<meta property="og:title" content="Mnemos - On-chain Card" />
 <meta property="og:description" content="A tarot card from a Mnemos reading, minted on Base Sepolia. Mnemos remembers every card it's ever pulled for you." />
 <style>
   :root {
@@ -290,7 +290,7 @@ async function load() {
     const attrEls = (meta.attributes || []).map(a =>
       el("div", { class: "attr" },
         el("div", { class: "k" }, a.trait_type || ""),
-        el("div", { class: "v" }, String(a.value ?? "—")))
+        el("div", { class: "v" }, String(a.value ?? "-")))
     );
 
     const right = el("div", { class: "meta" },

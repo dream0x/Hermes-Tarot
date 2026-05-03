@@ -176,6 +176,28 @@ def _gate(user_id: int) -> tuple[bool, str | None]:
     return True, None
 
 
+def _md_escape(text: str) -> str:
+    """Escape Telegram legacy-Markdown special chars so user input can't break formatting."""
+    out = []
+    for ch in text:
+        if ch in "_*`[":
+            out.append("\\")
+        out.append(ch)
+    return "".join(out)
+
+
+def _safe_err(e: BaseException) -> str:
+    """Format an exception for user-facing display. Hides stack-trace strings
+    that may contain bearer tokens (fal/Pinata 401 echoes) and avoids markdown
+    chars that would break Telegram parsing."""
+    name = type(e).__name__
+    msg = str(e)[:120]
+    # Strip backticks and asterisks; we send these as plain text not markdown.
+    for ch in "`*_[]()":
+        msg = msg.replace(ch, "")
+    return f"{name}: {msg}" if msg else name
+
+
 def _is_new_user(user_id: int) -> bool:
     p = Profile.load(user_id)
     return not (p.sun_sign or p.display_name or p.birth_place)
@@ -432,10 +454,10 @@ async def _do_reading(
         rendered = await asyncio.to_thread(oracle_mod.render_cards, drawn["cards"])
     except Exception as e:  # noqa: BLE001
         log.exception("pull/render failed")
-        await progress_msg.edit_text(f"The cards are uncooperative: `{e}`", parse_mode=ParseMode.MARKDOWN)
+        await progress_msg.edit_text(f"The cards are uncooperative.\n{_safe_err(e)}")
         return
 
-    caption = f"*“{question}”*\n_{spread.replace('_', ' ')}_"
+    caption = f"*“{_md_escape(question)}”*\n_{spread.replace('_', ' ')}_"
     media: list[InputMediaPhoto] = []
     for i, c in enumerate(rendered):
         path = Path(c["image_path"])
@@ -461,7 +483,7 @@ async def _do_reading(
         )
     except Exception as e:  # noqa: BLE001
         log.exception("interpret failed")
-        await progress_msg.edit_text(f"The oracle is silent: `{e}`", parse_mode=ParseMode.MARKDOWN)
+        await progress_msg.edit_text(f"The oracle is silent.\n{_safe_err(e)}")
         return
 
     reading = Reading(
@@ -598,7 +620,7 @@ async def _send_horoscope(update, ctx, user_id: int, sign: str) -> None:
         text = await asyncio.to_thread(oracle_mod.daily_horoscope, sign, user_id)
     except Exception as e:  # noqa: BLE001
         log.exception("horoscope failed")
-        await ctx.bot.send_message(chat_id, f"The Oracle stumbled: `{e}`", parse_mode=ParseMode.MARKDOWN)
+        await ctx.bot.send_message(chat_id, f"The Oracle stumbled.\n{_safe_err(e)}")
         return
     commit_read(user_id)
     await ctx.bot.send_message(chat_id, f"☀️ *{sign} — today*\n\n{text}", parse_mode=ParseMode.MARKDOWN)
@@ -722,8 +744,7 @@ async def _do_mint(ctx: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int,
         result = await asyncio.to_thread(oracle_mod.mint_card, user_id, reading_id, card_index)
     except Exception as e:  # noqa: BLE001
         log.exception("mint failed")
-        await ctx.bot.send_message(chat_id, f"Mint failed: `{e}`",
-                                    parse_mode=ParseMode.MARKDOWN)
+        await ctx.bot.send_message(chat_id, f"Mint failed.\n{_safe_err(e)}")
         return
 
     commit_mint(user_id)
@@ -782,7 +803,7 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 with open(c["image_path"], "rb") as f:
                     data_b = f.read()
                 if i == 0:
-                    media.append(InputMediaPhoto(media=data_b, caption=f"*“{question}”*",
+                    media.append(InputMediaPhoto(media=data_b, caption=f"*“{_md_escape(question)}”*",
                                                  parse_mode=ParseMode.MARKDOWN))
                 else:
                     media.append(InputMediaPhoto(media=data_b))
@@ -791,8 +812,7 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                                        reply_markup=_reading_keyboard(user_id, r.id))
         except Exception as e:  # noqa: BLE001
             log.exception("pull_again failed")
-            await ctx.bot.send_message(msg.chat_id, f"The cards resist: `{e}`",
-                                        parse_mode=ParseMode.MARKDOWN)
+            await ctx.bot.send_message(msg.chat_id, f"The cards resist.\n{_safe_err(e)}")
         return
 
     if data == "schedule_daily":
@@ -855,8 +875,7 @@ async def _job_daily_horoscope(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         text = await asyncio.to_thread(oracle_mod.daily_horoscope, sign, user_id)
     except Exception as e:  # noqa: BLE001
         log.exception("scheduled horoscope failed for %s", user_id)
-        await ctx.bot.send_message(chat_id, f"_Today's horoscope stumbled: {e}_",
-                                    parse_mode=ParseMode.MARKDOWN)
+        await ctx.bot.send_message(chat_id, f"Today's horoscope stumbled.\n{_safe_err(e)}")
         return
     await ctx.bot.send_message(chat_id, f"☀️ *{sign} — today*\n\n{text}",
                                 parse_mode=ParseMode.MARKDOWN)
@@ -867,15 +886,16 @@ async def _job_daily_horoscope(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ----------------------------------------------------------------------
 
 async def _on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
-    """Global error handler: log + tell the user something failed instead of going silent."""
+    """Global error handler: log + tell the user something failed instead of going silent.
+    Sends plain text (no markdown) to avoid double-failure when the error message contains
+    backticks or asterisks that would break Telegram's parser."""
     log.exception("Unhandled error", exc_info=ctx.error)
     try:
         chat = getattr(update, "effective_chat", None)
         if chat:
             await ctx.bot.send_message(
                 chat_id=chat.id,
-                text=f"_Something stumbled internally. The dev was notified._\n`{type(ctx.error).__name__}: {ctx.error}`",
-                parse_mode=ParseMode.MARKDOWN,
+                text=f"Something stumbled internally. The dev was notified.\n{_safe_err(ctx.error) if ctx.error else ''}",
             )
     except Exception:  # noqa: BLE001
         pass

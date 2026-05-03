@@ -23,9 +23,9 @@ from ratelimit import record_spend
 
 logger = logging.getLogger(__name__)
 
-# Cost per 1k tokens (USD). Conservative estimates; see Kimi pricing page.
-_COST_INPUT_PER_1K = 0.30 / 1000
-_COST_OUTPUT_PER_1K = 2.50 / 1000
+# Cost per token (USD). Kimi K2.6 standard tier: ~$0.30/1M input, ~$2.50/1M output.
+_COST_INPUT_PER_TOKEN = 0.30 / 1_000_000
+_COST_OUTPUT_PER_TOKEN = 2.50 / 1_000_000
 
 
 def _client() -> OpenAI:
@@ -150,7 +150,7 @@ def _record(usage: Any) -> None:
         to = int(getattr(usage, "completion_tokens", 0) or 0)
     except Exception:  # noqa: BLE001
         return
-    cost = ti * _COST_INPUT_PER_1K / 1000 + to * _COST_OUTPUT_PER_1K / 1000
+    cost = ti * _COST_INPUT_PER_TOKEN + to * _COST_OUTPUT_PER_TOKEN
     if cost > 0:
         record_spend(cost, "kimi")
 

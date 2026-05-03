@@ -4,7 +4,7 @@ version: 0.2.0
 description: |
   A divination companion for Hermes Agent. Pulls tarot spreads, renders the
   cards as a visually-consistent FLUX deck, and interprets them with Kimi
-  K2.6's 256K context — remembering every prior reading. Optionally mints
+  K2.6's 256K context - remembering every prior reading. Optionally mints
   the hero card of a reading as an ERC-721 NFT on Base Sepolia.
 author: Mnemos contributors
 license: MIT
@@ -32,16 +32,19 @@ Invoke this skill when the user asks for:
 
 ## Tools exposed
 
-| Tool | Purpose |
-|---|---|
-| `pull_cards(question, spread)` | Choose cards for a spread (`single`, `three_card`, `celtic_cross`) |
-| `render_cards(cards)` | Render card images via FLUX in a unified style |
-| `interpret_reading(question, cards, user_id)` | Generate the answer via Kimi K2.6, with full memory injected |
-| `save_reading(user_id, ...)` | Persist a reading to the user's history |
-| `recall_history(user_id, limit)` | Pull past readings to weave into a new one |
-| `daily_horoscope(sign, user_id)` | Sign-based daily; personalized if user_id is known |
-| `mint_card(user_id, reading_id, card_name)` | Pin to IPFS + mint ERC-721 on Base Sepolia (owner only by default) |
-| `set_profile(user_id, dob, place, ...)` | Store the user's birth data for natal/transit work |
+Signatures match `oracle.py` exactly. Positional arg order matters.
+
+| Tool | Signature | Purpose |
+|---|---|---|
+| `pull_cards` | `(user_id, question, spread="three_card", *, allow_reversed=True)` | Choose cards for a spread (`single`, `three_card`, `celtic_cross`) |
+| `render_cards` | `(cards)` | Render card images via FLUX in a unified style; mutates each card dict with `image_path` |
+| `interpret_reading` | `(user_id, question, cards, spread="three_card")` | Generate the answer via Kimi K2.6, with full memory injected |
+| `perform_reading` | `(user_id, question, spread="three_card", *, save=True)` | Convenience: pull -> render -> interpret -> save in one call |
+| `save_reading` | `(reading_dict)` | Persist a reading dict to the user's history; returns reading id |
+| `recall_history` | `(user_id, limit=5)` | Return the user's most recent N readings as dicts |
+| `daily_horoscope` | `(sign=None, user_id=None)` | Sign-based daily; personalized if `user_id` is known and has a saved sun sign |
+| `set_profile` | `(user_id, **fields)` | Store sun sign / dob / birth_place / wallet_address etc. |
+| `mint_card` | `(user_id, reading_id, card_index=0, to_address=None)` | Pin to IPFS + mint ERC-721 on Base Sepolia. Public mint enabled with per-user lifetime quota (see `ratelimit.can_mint`) |
 
 ## Tone
 
@@ -54,7 +57,8 @@ Invoke this skill when the user asks for:
 
 ## Guardrails
 
-- Public users are rate-limited (see `ratelimit.py`); the agent should fall back to a
-  friendly throttle message, never silently fail.
-- Mint button is **owner-only** by default — never offer it to public users.
-- All paid API calls (Kimi, FLUX, Pinata, on-chain) must respect `MAX_DAILY_USD_SPEND`.
+- **Reading rate limits** (per `ratelimit.py`): public 3/day + 10/lifetime, allowlist 20/day, owner unlimited. Failing tier returns a friendly throttle string; the agent should surface it verbatim, never silently fail.
+- **Mint quotas**: public 1/lifetime, allowlist 5/lifetime, owner unlimited. Public users with no wallet are asked inline by the bot; agent callers must pass `to_address` explicitly or set `profile.wallet_address` first.
+- **Spend ceiling**: all paid API calls (Kimi, FLUX, Pinata, on-chain gas) increment a global daily counter (`ratelimit.record_spend`). When `MAX_DAILY_USD_SPEND` is reached, all non-owner traffic is refused for the rest of the UTC day.
+- **Kill switch**: `PUBLIC_ENABLED=false` cuts all non-owner access without restart.
+- **Path safety**: `memory._user_dir` rejects any `user_id` that isn't `^-?\d+$` or `^test_…$` to block path-traversal from agent SDK callers.

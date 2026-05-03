@@ -2,7 +2,7 @@
 
 > *the oracle that remembers every card it's ever pulled for you*
 
-A divination companion built as a [Hermes Agent](https://hermes-agent.nousresearch.com/) skill. Mnemos pulls tarot spreads, paints the cards in a unified deck style with FLUX, and answers your question through them with **Kimi K2.6's 256K context** — using the entire history of readings it's ever given you. The hero card of each reading can be minted on **Base Sepolia** as an ERC-721 keepsake, viewable through a custom on-chain viewer.
+A divination companion built as a [Hermes Agent](https://hermes-agent.nousresearch.com/) skill. Mnemos pulls tarot spreads, paints the cards in a unified deck style with FLUX, and answers your question through them with **Kimi K2.6's 256K context** - using the entire history of readings it's ever given you. The hero card of each reading can be minted on **Base Sepolia** as an ERC-721 keepsake, viewable through a custom on-chain viewer.
 
 > **Try it live:** [@mnemos_oracle_bot](https://t.me/mnemos_oracle_bot) on Telegram
 > **View any minted card:** [the on-chain viewer](https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1)
@@ -15,15 +15,15 @@ Built for the [**Hermes Agent Creative Hackathon**](https://hermes-agent.nousres
 
 ## Why this exists
 
-The Hermes Agent ecosystem already has skills for FLUX images, Spotify playback, autonomous novel writing, and TouchDesigner. There was no skill for the **divination / personalization / spiritual companion** space — a category with massive Western mainstream traction (Co-Star: 30M users, WitchTok: billions of views).
+The Hermes Agent ecosystem already has skills for FLUX images, Spotify playback, autonomous novel writing, and TouchDesigner. There was no skill for the **divination / personalization / spiritual companion** space - a category with massive Western mainstream traction (Co-Star: 30M users, WitchTok: billions of views).
 
 Mnemos fills that gap and demonstrates Hermes' three real superpowers in one product:
 
 | Hermes Agent strength | How Mnemos uses it |
 |---|---|
-| **Persistent memory** | Every reading is appended to a per-user JSONL; every new reading injects up to 30 prior readings into Kimi's 256K context — the oracle *literally remembers every card you've ever pulled* |
-| **Scheduled tasks** (natural-language cron) | One tap on `📅 Daily at 9 AM UTC` registers a recurring job — your sun-sign horoscope arrives every morning, forever |
-| **Multi-platform** | The same `oracle.py` skill runs through any Hermes transport — Telegram is the first; Discord/Slack/WhatsApp would need ~30 min of config, no code changes |
+| **Persistent memory** | Every reading is appended to a per-user JSONL; every new reading injects up to 30 prior readings into Kimi's 256K context - the oracle *literally remembers every card you've ever pulled* |
+| **Scheduled tasks** (natural-language cron) | One tap on `📅 Daily at 9 AM UTC` registers a recurring job - your sun-sign horoscope arrives every morning, forever |
+| **Multi-platform** | The same `oracle.py` skill runs through any Hermes transport - Telegram is the first; Discord/Slack/WhatsApp would need ~30 min of config, no code changes |
 
 It also showcases **Kimi K2.6's 256K context** as a personalization engine, not just a long-doc reader.
 
@@ -35,10 +35,10 @@ Most chatbot tarot readers do one of two things: (a) describe each card in the a
 
 The system prompt forces a specific shape on every reading:
 
-1. **Frame** — restate the question in one sentence that names *what kind* of question it is (timing? trust? readiness?). Show the user you heard them.
-2. **Cards as answer** — one paragraph per card. Each paragraph translates the card's archetype into a concrete answer for *this* user's *specific* situation. No textbook recitation.
-3. **Direction** — the final paragraph delivers a single, soft instruction. Not a prediction; a stance to hold. Ends with a body image (breath, posture, footing).
-4. **Memory call-back** — when relevant, the reading references your prior readings ("Last week the Magician came to you — that cycle is closing now"). At most one per session.
+1. **Frame** - restate the question in one sentence that names *what kind* of question it is (timing? trust? readiness?). Show the user you heard them.
+2. **Cards as answer** - one paragraph per card. Each paragraph translates the card's archetype into a concrete answer for *this* user's *specific* situation. No textbook recitation.
+3. **Direction** - the final paragraph delivers a single, soft instruction. Not a prediction; a stance to hold. Ends with a body image (breath, posture, footing).
+4. **Memory call-back** - when relevant, the reading references your prior readings ("Last week the Magician came to you - that cycle is closing now"). At most one per session.
 
 All of this is delivered as plain prose, in English only, regardless of the language of the question.
 
@@ -83,7 +83,7 @@ Critical files:
 | Path | Role |
 |---|---|
 | `SKILL.md` | agentskills.io manifest Hermes auto-discovers |
-| `oracle.py` | Public skill API — pull / render / interpret / mint / save |
+| `oracle.py` | Public skill API - pull / render / interpret / mint / save |
 | `bot.py` | Telegram transport (BotCommands menu, ConversationHandler onboarding, mint button) |
 | `kimi.py` | Kimi K2.6 client with the locked persona + few-shot |
 | `tarot/deck.py` | Full 78-card RWS dataset (public domain) |
@@ -108,7 +108,7 @@ Critical files:
 ```bash
 git clone https://github.com/dream0x/Mnemos.git
 cd Mnemos
-cp .env.example .env       # then fill in real keys — see .env.example
+cp .env.example .env       # then fill in real keys - see .env.example
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -146,13 +146,59 @@ python scripts/smoke_test.py                      # all 5 services in one go
 
 ---
 
-## Powered by
+## How Mnemos uses Hermes Agent
 
-- [**Hermes Agent**](https://hermes-agent.nousresearch.com/) by Nous Research — persistent-memory agent runtime
-- [**Kimi K2.6**](https://www.kimi.com/ai-models/kimi-k2-6) by Moonshot AI — 256K context, OpenAI-compatible API, agent swarm
-- [**FLUX**](https://blackforestlabs.ai/) by Black Forest Labs — image generation via fal.ai
-- [**Base**](https://base.org/) Sepolia testnet — gas-free ERC-721 mint
-- [**Pinata**](https://www.pinata.cloud/) — IPFS pinning
+Mnemos is structured as a first-class **Hermes Agent skill**, not a standalone app that happens to wrap an LLM. Three things make this real:
+
+**1. The skill manifest (`SKILL.md`)** follows the [agentskills.io](https://agentskills.io) standard. When you drop the project into `~/.hermes/skills/mnemos`, Hermes auto-discovers it from the YAML frontmatter (`name`, `version`, `description`, `runtime`) and loads the tool surface declared in the markdown body. The agent can then invoke Mnemos from natural language ("pull cards on this", "give me my horoscope") without any user-side wiring.
+
+**2. The skill API (`oracle.py`)** exposes a flat set of tools designed to be agent-callable, not user-callable. Each function takes plain JSON-serializable arguments and returns plain dicts:
+
+| Tool | Returns | When the agent calls it |
+|---|---|---|
+| `pull_cards(user_id, question, spread)` | `{question, spread, cards: [...]}` | User asks for a reading |
+| `render_cards(cards)` | cards with `image_path` filled | Always after `pull_cards` |
+| `interpret_reading(user_id, question, cards, spread)` | string | After cards are rendered |
+| `daily_horoscope(sign, user_id)` | string | "what's my horoscope today" |
+| `set_profile(user_id, **fields)` | profile dict | "I'm a Pisces" |
+| `recall_history(user_id, limit)` | list of past readings | "what cards did I get last week" |
+| `mint_card(user_id, reading_id, card_index, to_address)` | mint result with token id + viewer URL | "mint that one on-chain" |
+
+The Telegram bot in `bot.py` is just *one* transport that calls these tools. The same module, dropped into a Hermes-with-Discord install, works untouched.
+
+**3. The persistent-memory pattern** is Hermes' signature feature, and Mnemos leans into it hard. Hermes itself uses `~/.hermes/MEMORY.md` + `~/.hermes/USER.md` for global agent memory. Mnemos adds *skill-scoped* memory underneath: per-user JSONL files at `data/{telegram_user_id}/readings.jsonl` plus `profile.json`. Every reading is appended; every new reading reads the tail back into the prompt. Hermes' built-in scheduler is what powers the daily-horoscope cron — when the user taps `📅 Daily at 9 AM UTC`, we register a recurring job whose handler simply calls `oracle.daily_horoscope()` and DM's the result. No custom cron service needed.
+
+> The result: Mnemos is the kind of skill that actually *grows with you*. The same skill instance, used over weeks, references your real history. That's a Hermes-shaped product, not a one-shot LLM call dressed up.
+
+---
+
+## How Mnemos uses Kimi K2.6
+
+Kimi K2.6 (Moonshot AI's 1T-parameter MoE) is the **interpretation engine**. We hit it through the OpenAI-compatible endpoint at `https://api.moonshot.ai/v1`, model id `kimi-k2.6`. Every Mnemos reading and every horoscope is a Kimi call. Three implementation choices matter:
+
+**1. The 256K context window is the literal product mechanic.** A typical 3-card reading sends Kimi:
+- The locked persona (~1.5K tokens, see `kimi.py::_SYSTEM_PROMPT`)
+- One few-shot example demonstrating tone and form (~1K tokens)
+- The user's full profile JSON (sun sign, birth place, wallet, …)
+- **Up to the last 30 readings, weighed by recency** (`memory.py::context_snapshot`, capped at 60K chars / ~15K tokens with oldest-first truncation)
+- The current question and freshly-drawn cards
+
+That's typically 5-20K input tokens, well under the 256K ceiling. The result: Mnemos can naturally reference last week's pull ("the Magician walked behind you then; the Tower turning now is its echo") without any retrieval-augmentation pipeline. We just put the history in the context, and Kimi notices what matters.
+
+**2. `thinking: disabled` for warm immediate prose.** K2.6 ships with a "thinking" reasoning mode that emits chain-of-thought tokens to a separate field. For a divination tone we want the *first* response to be the final response — no inner monologue, no scaffolding, no apologetic preamble. We pass `extra_body={"thinking": {"type": "disabled"}}` on every chat completion (see `kimi.py::_chat`). This roughly halves latency too.
+
+**3. A locked output shape with belt-and-suspenders.** The system prompt enforces a strict 4-paragraph form: *frame the question → cards as direct answer → concrete direction → close on a body image*, plus a one-line italic disclaimer. It also explicitly forbids em-dashes (a model tic) and lists 8 phrases to never use ("I sense", "trust your gut", etc.). On top of that, `kimi.py::_strip_dashes` post-processes every response to replace any em/en-dash that slips through with a comma or hyphen. The output is reliably plain prose ready to ship straight to Telegram.
+
+**Cost**: ~$0.30 per 1M input tokens, ~$2.50 per 1M output. A 3-card reading averages ~5K input + ~700 output ≈ $0.0033. The daily $5 spend ceiling in `ratelimit.py` covers ~1500 readings before the kill switch trips.
+
+---
+
+## Other infrastructure
+
+- [**FLUX [dev]**](https://blackforestlabs.ai/) by Black Forest Labs (via [fal.ai](https://fal.ai)) - card image generation. ~$0.025/image, 4-5s per call. We pre-render all 22 Major Arcana into a disk cache so demo readings are instant; only Minor Arcana cards trigger a fresh render. A Pillow post-process overlays the correct card title in EB Garamond serif (FLUX hallucinates fake titles, so we always overwrite them) and rotates 180° for reversed cards.
+- [**Base Sepolia**](https://base.org/) - gas-free L2 testnet for the ERC-721 mint. Contract is a single-file 200-line ERC-721 (no OpenZeppelin imports, ships with the repo), pre-compiled artifact at `nft/build/OracleCard.json` so the production server never invokes solcx.
+- [**Pinata**](https://www.pinata.cloud/) - IPFS pinning for card images and ERC-721 metadata JSON. Free tier comfortably covers hackathon traffic.
+- [**Hetzner CX22**](https://www.hetzner.com/cloud) - €4.5/mo VPS running the bot under systemd (auto-restart, ufw firewall, hardened with `NoNewPrivileges`, `ProtectSystem=full`, `ProtectHome=read-only`).
 
 ---
 
@@ -164,9 +210,9 @@ python scripts/smoke_test.py                      # all 5 services in one go
 - Mobile-friendly Telegram WebApp for richer card flips
 - More spreads (Celtic Cross, Year-Ahead, Career Cross)
 - Astrology natal chart rendering (skyfield is already in deps)
-- Optional opt-in "predictions tracked" — Mnemos revisits old readings and asks if they came true
+- Optional opt-in "predictions tracked" - Mnemos revisits old readings and asks if they came true
 
 ---
 
 ## License
-MIT — see `LICENSE`. The live public bot may be offline after hackathon judging concludes; this code is reference and reproducible by anyone with their own API keys.
+MIT - see `LICENSE`. The live public bot may be offline after hackathon judging concludes; this code is reference and reproducible by anyone with their own API keys.

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Literal
 
 from config import cfg
-from memory import _user_dir
+from memory import _user_dir, file_lock
 
 Tier = Literal["owner", "allowlist", "public"]
 
@@ -79,13 +79,15 @@ def _save_global(g: GlobalSpend) -> None:
 
 
 def record_spend(amount_usd: float, source: str) -> GlobalSpend:
+    """Read-modify-write under a file lock so concurrent calls don't lose increments."""
     today = _today_utc()
-    g = _load_global()
-    if g.day_key != today:
-        g = GlobalSpend(day_key=today)
-    g.spent_usd = round(g.spent_usd + amount_usd, 6)
-    g.breakdown[source] = round(g.breakdown.get(source, 0.0) + amount_usd, 6)
-    _save_global(g)
+    with file_lock(GLOBAL_SPEND_PATH):
+        g = _load_global()
+        if g.day_key != today:
+            g = GlobalSpend(day_key=today)
+        g.spent_usd = round(g.spent_usd + amount_usd, 6)
+        g.breakdown[source] = round(g.breakdown.get(source, 0.0) + amount_usd, 6)
+        _save_global(g)
     return g
 
 
@@ -155,16 +157,17 @@ def check_can_read(user_id: int | str) -> Decision:
 
 
 def commit_read(user_id: int | str) -> Quota:
-    """Increment counters AFTER a successful reading is served."""
-    q = load_quota(user_id)
+    """Increment counters AFTER a successful reading is served. Locked."""
     today = _today_utc()
-    if q.day_key != today:
-        q.day_key = today
-        q.day_count = 0
-    q.day_count += 1
-    q.lifetime_count += 1
-    q.last_seen = time.time()
-    save_quota(q)
+    with file_lock(_quota_path(user_id)):
+        q = load_quota(user_id)
+        if q.day_key != today:
+            q.day_key = today
+            q.day_count = 0
+        q.day_count += 1
+        q.lifetime_count += 1
+        q.last_seen = time.time()
+        save_quota(q)
     return q
 
 
@@ -194,9 +197,11 @@ def can_mint(user_id: int | str) -> Decision:
 
 
 def commit_mint(user_id: int | str) -> Quota:
-    q = load_quota(user_id)
-    q.mint_lifetime += 1
-    save_quota(q)
+    """Increment lifetime mint counter under lock."""
+    with file_lock(_quota_path(user_id)):
+        q = load_quota(user_id)
+        q.mint_lifetime += 1
+        save_quota(q)
     return q
 
 
