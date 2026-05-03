@@ -109,9 +109,10 @@ def _send_tx(w3: Web3, tx: dict[str, Any]) -> dict[str, Any]:
     signed = acct.sign_transaction(tx)
     raw = signed.raw_transaction
     tx_hash = w3.eth.send_raw_transaction(raw)
-    log.info("tx sent: %s", tx_hash.hex())
+    log.info("MNEMOS_EVENT mint stage=tx_sent hash=%s", tx_hash.hex())
     receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
-    log.info("tx mined in block %s (status %s)", receipt.blockNumber, receipt.status)
+    log.info("MNEMOS_EVENT mint stage=tx_mined block=%s status=%s",
+             receipt.blockNumber, receipt.status)
     if receipt.status != 1:
         raise RuntimeError(f"tx reverted: {tx_hash.hex()}")
     return {"tx_hash": tx_hash.hex(), "block": receipt.blockNumber, "receipt": receipt}
@@ -232,9 +233,12 @@ def mint_oracle_card(
     if not image_path.exists():
         raise RuntimeError(f"missing image {image_path}")
 
-    image_cid = pin_file(image_path, name=f"hermes-oracle-{card['id']}.png")
+    _mint_log = logging.getLogger("mnemos.mint")
+    _mint_log.info("MNEMOS_EVENT mint stage=pin_image card=%s", card['id'])
+    image_cid = pin_file(image_path, name=f"mnemos-{card['id']}.png")
+    _mint_log.info("MNEMOS_EVENT mint stage=pin_meta cid=%s", image_cid)
     metadata = build_metadata(card, question, interpretation_excerpt, reading_id, image_cid)
-    metadata_cid = pin_json(metadata, name=f"hermes-oracle-{reading_id}-{card['id']}.json")
+    metadata_cid = pin_json(metadata, name=f"mnemos-{reading_id}-{card['id']}.json")
     token_uri = f"ipfs://{metadata_cid}"
 
     w3 = _w3()
@@ -280,7 +284,8 @@ def mint_oracle_card(
         "image_cid": image_cid,
         "metadata_cid": metadata_cid,
     }
-    log.info("minted #%s -> %s", token_id, out["viewer_url"])
+    log.info("MNEMOS_EVENT mint stage=done token_id=%s viewer=%s",
+             token_id, out["viewer_url"])
     return out
 
 

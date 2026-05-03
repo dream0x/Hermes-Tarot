@@ -458,7 +458,8 @@ async def _do_reading(
         await update.message.reply_text(refusal or "Not now.", parse_mode=ParseMode.MARKDOWN)
         return
 
-    log.info("reading: user=%s spread=%s q=%r", _user_label(update), spread, question[:80])
+    log.info("MNEMOS_EVENT reading stage=start user=%s spread=%s question=%r",
+             _user_label(update), spread, question[:80])
     await ctx.bot.send_chat_action(chat_id, ChatAction.TYPING)
     progress_msg = await update.message.reply_text(THINKING, parse_mode=ParseMode.MARKDOWN)
 

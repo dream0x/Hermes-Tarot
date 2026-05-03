@@ -157,10 +157,16 @@ def render_card(
     force: bool = False,
 ) -> Path:
     """Return a path to a PNG of the card. Uses on-disk cache."""
+    import logging as _lg
+    _flux_log = _lg.getLogger("mnemos.flux")
     cache = _cache_key(card_id, reversed_)
     if cache.exists() and not force:
+        _flux_log.info("MNEMOS_EVENT flux model=cache card=%s reversed=%s cost_usd=0",
+                       card_id, reversed_)
         return cache
 
+    _flux_log.info("MNEMOS_EVENT flux model=%s card=%s reversed=%s cost_usd=%.4f",
+                   MODEL_ID, card_id, reversed_, COST_PER_IMAGE_USD)
     _ensure_fal_creds()
     if art_fragment is None:
         art_fragment = deck_mod.by_id(card_id).art_prompt

@@ -141,8 +141,9 @@ def _format_cards_for_prompt(cards: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _record(usage: Any) -> None:
-    """Convert OpenAI usage block -> dollars and log to global spend."""
+def _record(usage: Any, kind: str = "interpret") -> None:
+    """Convert OpenAI usage block -> dollars and log to global spend.
+    Emits a structured INFO line the demo streamer picks up."""
     if usage is None:
         return
     try:
@@ -153,6 +154,9 @@ def _record(usage: Any) -> None:
     cost = ti * _COST_INPUT_PER_TOKEN + to * _COST_OUTPUT_PER_TOKEN
     if cost > 0:
         record_spend(cost, "kimi")
+    # MNEMOS_EVENT lines are picked up by scripts/demo_logs.py
+    logger.info("MNEMOS_EVENT kimi kind=%s in=%d out=%d cost_usd=%.6f",
+                kind, ti, to, cost)
 
 
 _DASH_CHARS = "—–―"  # em-dash, en-dash, horizontal-bar
@@ -180,7 +184,8 @@ def _strip_dashes(text: str) -> str:
     return "".join(out)
 
 
-def _chat(messages: list[dict[str, str]], *, max_tokens: int = 1200, retries: int = 2) -> str:
+def _chat(messages: list[dict[str, str]], *, max_tokens: int = 1200, retries: int = 2,
+          kind: str = "interpret") -> str:
     """Single non-streaming Kimi call. Disables `thinking` mode (slow + we don't need
     chain-of-thought in user-facing output)."""
     client = _client()
@@ -195,7 +200,7 @@ def _chat(messages: list[dict[str, str]], *, max_tokens: int = 1200, retries: in
                 extra_body={"thinking": {"type": "disabled"}},
             )
             text = (resp.choices[0].message.content or "").strip()
-            _record(getattr(resp, "usage", None))
+            _record(getattr(resp, "usage", None), kind=kind)
             if not text:
                 raise RuntimeError("empty content from kimi")
             return _strip_dashes(text)
@@ -254,7 +259,7 @@ no sign-off, no list. End on a single sensory image.
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": user_block},
     ]
-    return _chat(messages, max_tokens=300)
+    return _chat(messages, max_tokens=300, kind="horoscope")
 
 
 def ping() -> str:
