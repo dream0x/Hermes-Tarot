@@ -1,0 +1,55 @@
+# --- Secrets / config ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+keystore/
+*.keystore
+secrets/
+
+# --- User data (personal, never publish) ---
+data/*
+!data/.gitkeep
+MEMORY.md
+USER.md
+
+# --- Generated / cached media ---
+tarot/cache/*.png
+tarot/cache/*.jpg
+tarot/cache/*.webp
+!tarot/cache/.gitkeep
+
+# --- Foundry / web3 ---
+out/
+cache/
+broadcast/
+forge-cache/
+lib/
+node_modules/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# --- Logs ---
+*.log
+logs/

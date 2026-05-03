@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Hermes Oracle — On-chain Card Viewer</title>
+<meta name="description" content="View a Hermes Oracle tarot card minted on Base Sepolia. Powered by Hermes Agent and Kimi K2.6." />
+<meta property="og:title" content="Hermes Oracle — On-chain Card" />
+<meta property="og:description" content="A tarot card from a Hermes Oracle reading, minted on Base Sepolia." />
+<style>
+  :root {
+    --bg: #0d0a14;
+    --bg-2: #18122a;
+    --gold: #c8a36a;
+    --gold-soft: #e9c897;
+    --indigo: #4d4583;
+    --crimson: #8c2c3c;
+    --ink: #f3ead6;
+    --muted: #8e89a3;
+    --frame: #2a2545;
+  }
+  * { box-sizing: border-box }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background:
+      radial-gradient(1100px 700px at 80% -10%, rgba(140, 44, 60, 0.18), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(77, 69, 131, 0.28), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font-family: "EB Garamond", "Iowan Old Style", Georgia, "Times New Roman", serif;
+    font-size: 18px; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--gold-soft); text-decoration: none; border-bottom: 1px dotted var(--gold); }
+  a:hover { color: #fff }
+  header {
+    padding: 22px 28px; display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 1px solid var(--frame);
+  }
+  header .title {
+    font-size: 22px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--gold-soft);
+  }
+  header .crumbs { color: var(--muted); font-size: 14px }
+  main {
+    max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px;
+    display: grid; grid-template-columns: minmax(260px, 460px) 1fr; gap: 40px;
+  }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr } }
+  .card-wrap {
+    position: relative;
+    background: var(--bg-2);
+    border: 1px solid var(--frame);
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(232, 200, 151, 0.05);
+  }
+  .card-wrap img {
+    width: 100%; display: block; border-radius: 8px;
+    background: #000;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+  }
+  .card-wrap .reversed-flag {
+    position: absolute; top: 22px; right: 22px;
+    background: rgba(140, 44, 60, 0.85); color: #fff; padding: 4px 10px;
+    border-radius: 999px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .meta h1 {
+    font-family: "EB Garamond", serif; font-size: 38px; line-height: 1.1; margin: 0 0 4px;
+    color: var(--gold-soft); letter-spacing: 0.01em;
+  }
+  .meta .sub {
+    color: var(--muted); margin-bottom: 22px; font-style: italic;
+  }
+  .meta p { margin: 0 0 18px; max-width: 60ch }
+  .attrs {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+    margin: 18px 0 26px;
+  }
+  .attr {
+    border: 1px solid var(--frame); border-radius: 8px;
+    padding: 10px 12px; background: rgba(255,255,255,0.02);
+  }
+  .attr .k { color: var(--muted); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase }
+  .attr .v { color: var(--ink); font-size: 17px; margin-top: 2px }
+  .links { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px }
+  .links a {
+    border: 1px solid var(--gold); padding: 8px 14px; border-radius: 999px;
+    font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold-soft);
+  }
+  .links a:hover { background: var(--gold); color: var(--bg) }
+  .empty, .error {
+    grid-column: 1 / -1; padding: 60px 0; text-align: center; color: var(--muted);
+  }
+  .error { color: #e8a3b1 }
+  .form {
+    grid-column: 1 / -1; max-width: 640px; margin: 24px auto 0;
+    border: 1px solid var(--frame); padding: 18px 20px; border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+  }
+  .form label { display: block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px }
+  .form input {
+    width: 100%; padding: 9px 12px; background: var(--bg); color: var(--ink);
+    border: 1px solid var(--frame); border-radius: 6px; font: inherit; margin-bottom: 12px;
+  }
+  .form button {
+    background: var(--gold); color: var(--bg); border: 0; padding: 9px 18px;
+    border-radius: 999px; font: inherit; cursor: pointer; letter-spacing: 0.06em; text-transform: uppercase;
+  }
+  footer {
+    text-align: center; padding: 36px 12px; color: var(--muted); font-size: 13px;
+    border-top: 1px solid var(--frame);
+  }
+  footer a { color: var(--muted) }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">🔮 Hermes Oracle</div>
+  <div class="crumbs"><span id="chainLabel">Base Sepolia</span></div>
+</header>
+<main id="root">
+  <div class="empty">Loading…</div>
+</main>
+<footer>
+  Built on <a href="https://hermes-agent.nousresearch.com/" target="_blank" rel="noopener">Hermes Agent</a> ·
+  Voice by <a href="https://www.kimi.com/" target="_blank" rel="noopener">Kimi K2.6</a> ·
+  Cards by <a href="https://blackforestlabs.ai/" target="_blank" rel="noopener">FLUX</a> ·
+  Chain: <a href="https://base.org" target="_blank" rel="noopener">Base Sepolia</a>
+</footer>
+
+<script>
+// --- Config ---
+// Base Sepolia public RPC (no key required, fine for low-volume reads)
+const RPC = "https://sepolia.base.org";
+const CHAIN_ID = 84532;
+const BASESCAN_TX  = (h) => `https://sepolia.basescan.org/tx/${h}`;
+const BASESCAN_TOK = (c, t) => `https://sepolia.basescan.org/token/${c}?a=${t}`;
+const BASESCAN_ADDR = (c) => `https://sepolia.basescan.org/address/${c}`;
+const IPFS_GATEWAYS = [
+  "https://gateway.pinata.cloud/ipfs/",
+  "https://ipfs.io/ipfs/",
+  "https://cloudflare-ipfs.com/ipfs/",
+];
+
+// --- Tiny ABI-free JSON-RPC helpers ---
+function pad(addr) { return addr.toLowerCase().replace(/^0x/, "").padStart(64, "0"); }
+function padInt(n) {
+  const hex = BigInt(n).toString(16);
+  return hex.padStart(64, "0");
+}
+async function ethCall(to, data) {
+  const body = {
+    jsonrpc: "2.0", id: 1, method: "eth_call",
+    params: [{ to, data }, "latest"],
+  };
+  const r = await fetch(RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const j = await r.json();
+  if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
+  return j.result;
+}
+function decodeString(hex) {
+  // Solidity ABI: dynamic string => offset(32) + length(32) + bytes
+  if (!hex || hex === "0x") return "";
+  const raw = hex.slice(2);
+  const len = parseInt(raw.slice(64, 128), 16);
+  const bytes = raw.slice(128, 128 + len * 2);
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 2) out += "%" + bytes.slice(i, i + 2);
+  return decodeURIComponent(out);
+}
+function decodeAddress(hex) {
+  if (!hex) return null;
+  return "0x" + hex.slice(-40);
+}
+async function tokenURI(contract, tokenId) {
+  // tokenURI(uint256) => 0xc87b56dd
+  const data = "0xc87b56dd" + padInt(tokenId);
+  const r = await ethCall(contract, data);
+  return decodeString(r);
+}
+async function ownerOf(contract, tokenId) {
+  // ownerOf(uint256) => 0x6352211e
+  const data = "0x6352211e" + padInt(tokenId);
+  const r = await ethCall(contract, data);
+  return decodeAddress(r);
+}
+async function nameSym(contract) {
+  // name() 0x06fdde03 + symbol() 0x95d89b41
+  const [n, s] = await Promise.all([
+    ethCall(contract, "0x06fdde03"),
+    ethCall(contract, "0x95d89b41"),
+  ]);
+  return { name: decodeString(n), symbol: decodeString(s) };
+}
+
+async function fetchMetadata(uri) {
+  const url = uri.startsWith("ipfs://")
+    ? IPFS_GATEWAYS[0] + uri.slice("ipfs://".length)
+    : uri;
+  for (let i = 0; i < IPFS_GATEWAYS.length; i++) {
+    const tryUrl = uri.startsWith("ipfs://")
+      ? IPFS_GATEWAYS[i] + uri.slice("ipfs://".length)
+      : url;
+    try {
+      const r = await fetch(tryUrl, { cache: "no-store" });
+      if (r.ok) return { meta: await r.json(), via: tryUrl };
+    } catch (e) { /* try next */ }
+  }
+  throw new Error("All IPFS gateways failed for " + uri);
+}
+function ipfsToHttp(uri) {
+  if (!uri) return uri;
+  if (uri.startsWith("ipfs://")) return IPFS_GATEWAYS[0] + uri.slice("ipfs://".length);
+  return uri;
+}
+
+// --- Render ---
+function el(tag, attrs = {}, ...children) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") e.className = v;
+    else if (k === "html") e.innerHTML = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null) continue;
+    e.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return e;
+}
+
+function renderForm(root, defaults = {}) {
+  const f = el("form", { class: "form" });
+  f.innerHTML = `
+    <label for="contract">Contract address</label>
+    <input id="contract" name="contract" placeholder="0x..." value="${defaults.contract || ""}" required>
+    <label for="token">Token ID</label>
+    <input id="token" name="token" placeholder="1" value="${defaults.token || ""}" required>
+    <button type="submit">View card</button>
+  `;
+  f.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const c = f.contract.value.trim();
+    const t = f.token.value.trim();
+    location.search = `?contract=${encodeURIComponent(c)}&token=${encodeURIComponent(t)}`;
+  });
+  root.appendChild(f);
+}
+
+async function load() {
+  const root = document.getElementById("root");
+  const params = new URLSearchParams(location.search);
+  const contract = params.get("contract");
+  const token = params.get("token");
+
+  if (!contract || !token) {
+    root.innerHTML = "";
+    root.appendChild(el("div", { class: "empty" }, "Enter a Hermes Oracle contract address and token id to view the card."));
+    renderForm(root);
+    return;
+  }
+
+  root.innerHTML = "";
+  root.appendChild(el("div", { class: "empty" }, "Reading from Base Sepolia…"));
+
+  try {
+    const [{ name, symbol }, owner, uri] = await Promise.all([
+      nameSym(contract),
+      ownerOf(contract, token),
+      tokenURI(contract, token),
+    ]);
+    const { meta, via } = await fetchMetadata(uri);
+    const reversed = (meta.attributes || []).some(a => (a.trait_type || "").toLowerCase() === "orientation" && (a.value || "").toLowerCase() === "reversed");
+
+    const cardImg = ipfsToHttp(meta.image || "");
+
+    root.innerHTML = "";
+
+    const left = el("div", { class: "card-wrap" },
+      reversed ? el("div", { class: "reversed-flag" }, "Reversed") : null,
+      el("img", { src: cardImg, alt: meta.name || "Hermes Oracle card" })
+    );
+
+    const attrEls = (meta.attributes || []).map(a =>
+      el("div", { class: "attr" },
+        el("div", { class: "k" }, a.trait_type || ""),
+        el("div", { class: "v" }, String(a.value ?? "—")))
+    );
+
+    const right = el("div", { class: "meta" },
+      el("h1", {}, meta.name || `${name} #${token}`),
+      el("div", { class: "sub" }, `${name} · #${token} · owned by ${owner.slice(0, 6)}…${owner.slice(-4)}`),
+      el("p", {}, meta.description || ""),
+      el("div", { class: "attrs" }, ...attrEls),
+      el("div", { class: "links" },
+        el("a", { href: BASESCAN_TOK(contract, token), target: "_blank", rel: "noopener" }, "Basescan token"),
+        el("a", { href: BASESCAN_ADDR(contract), target: "_blank", rel: "noopener" }, "Contract"),
+        el("a", { href: via, target: "_blank", rel: "noopener" }, "Raw metadata"),
+        el("a", { href: cardImg, target: "_blank", rel: "noopener" }, "Image"),
+      ),
+    );
+
+    root.appendChild(left);
+    root.appendChild(right);
+  } catch (err) {
+    root.innerHTML = "";
+    root.appendChild(el("div", { class: "error" },
+      el("div", {}, "Could not load this card."),
+      el("div", { class: "sub" }, String(err.message || err))
+    ));
+    renderForm(root, { contract, token });
+  }
+}
+
+load();
+</script>
+</body>
+</html>

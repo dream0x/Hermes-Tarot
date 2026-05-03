@@ -1,0 +1,27 @@
+# Hermes Oracle — runtime deps
+# Pinned loosely; tighten before deploy if stability bites.
+
+# LLM client (Kimi K2.6 is OpenAI-compatible)
+openai>=1.40.0
+
+# Image generation
+fal-client>=0.5.0
+
+# IPFS / HTTP
+requests>=2.31.0
+
+# Web3 (NFT mint on Base Sepolia)
+web3>=6.20.0
+eth-account>=0.13.0
+
+# Config
+python-dotenv>=1.0.0
+
+# Telegram (used only if we run a standalone bot — Hermes has its own backend)
+python-telegram-bot>=21.0
+
+# Astro calc (lightweight; pyswisseph is heavier, skyfield is pure-python)
+skyfield>=1.49
+
+# Dev / testing
+pytest>=8.0.0
