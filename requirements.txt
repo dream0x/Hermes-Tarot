@@ -6,6 +6,7 @@ openai>=1.40.0
 
 # Image generation
 fal-client>=0.5.0
+Pillow>=10.4.0
 
 # IPFS / HTTP
 requests>=2.31.0
@@ -13,6 +14,7 @@ requests>=2.31.0
 # Web3 (NFT mint on Base Sepolia)
 web3>=6.20.0
 eth-account>=0.13.0
+py-solc-x>=2.0.0
 
 # Config
 python-dotenv>=1.0.0
