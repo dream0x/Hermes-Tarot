@@ -1,4 +1,4 @@
-"""Mnemos — Telegram bot transport.
+"""Mnemos - Telegram bot transport.
 
 A thin wrapper around `oracle.py`. Owns the Telegram UX:
   • Persistent ReplyKeyboard with the main actions (Pull, Single, Horoscope, …)
@@ -56,7 +56,7 @@ log = logging.getLogger("mnemos.bot")
 BRAND = "Mnemos"
 TAGLINE = "the oracle that remembers every card it's ever pulled for you"
 
-# ----- Reply keyboard labels (these MUST be exact — they are also the Regex patterns) -----
+# ----- Reply keyboard labels (these MUST be exact - they are also the Regex patterns) -----
 BTN_PULL = "🔮 Pull cards"
 BTN_SINGLE = "🃏 Single card"
 BTN_HOROSCOPE = "☀️ Horoscope"
@@ -77,44 +77,46 @@ MAIN_KB = ReplyKeyboardMarkup(
 
 WELCOME_RETURNING = (
     f"🪞 *Welcome back to {BRAND}.*\n\n"
-    "Tap a button below — or just send a question and the cards will answer."
+    "Tap a button below - or just send a question and the cards will answer."
 )
 
 WELCOME_NEW = (
-    f"🪞 *{BRAND}* — {TAGLINE}.\n\n"
+    f"🪞 *{BRAND}* - {TAGLINE}.\n\n"
     "Powered by Hermes Agent (Nous Research) and Kimi K2.6 (Moonshot AI).\n\n"
     "Let's set up your reading profile in 30 seconds. You can change anything later "
     "with /profile."
 )
 
 HELP_TEXT = f"""\
-🪞 *{BRAND}* — full command guide
+🪞 *{BRAND}* - full command guide
 
 *Reading the cards*
-  🔮 *Pull cards* — three-card spread (past · present · future). Bot will ask for your question.
-  🃏 *Single card* — one-card reading for a tight question.
-  Or just *send any message* — we'll treat it as a question and pull a 3-card spread immediately.
+  🔮 *Pull cards* - three-card spread (past · present · future). Bot will ask for your question.
+  🃏 *Single card* - one-card reading for a tight question.
+  Or just *send any message* - we'll treat it as a question and pull a 3-card spread immediately.
 
 *Astrology*
-  ☀️ *Horoscope* — today's horoscope for your sun sign. If you haven't set one, the bot will ask.
+  ☀️ *Horoscope* - today's horoscope for your sun sign. If you haven't set one, the bot will ask.
 
 *Your context*
-  👤 *Profile* — view profile (sun sign, birth place, wallet for NFTs).
-  🕯️ *History* — your last 5 readings.
+  👤 *Profile* - view profile (sun sign, birth place, wallet for NFTs).
+  🕯️ *History* - your last 5 readings.
 
 *Buttons under each reading*
-  🔮 *Mint hero card on-chain* — pin the first card's image to IPFS and mint it as an ERC-721 on Base Sepolia. Owner-gated by default.
-  📅 *Daily at 9 AM UTC* — register a recurring horoscope at 09:00 UTC.
-  🪞 *Pull again* — re-runs the same question with a fresh draw.
+  🔮 *Mint <position>: <Card>* - one button per card. Pick the one that resonates and pin its image to IPFS + mint as ERC-721 on Base Sepolia. Public users get 1 lifetime mint.
+  🪞 *Pull again* - re-runs the same question with a fresh draw.
+
+*After your horoscope*
+  📅 *Daily at 9 AM UTC* - opt in to a recurring morning horoscope for your sun sign.
 
 *Slash-command shortcuts*
   /pull <question> · /single <question> · /horoscope <sign> · /profile · /history · /start
 
 *How {BRAND} actually thinks*
-  Every reading is appended to a JSONL file scoped to your Telegram ID. The next reading injects up to 30 prior readings into Kimi K2.6's 256K context — so the oracle literally references where you've been.
+  Every reading is appended to a JSONL file scoped to your Telegram ID. The next reading injects up to 30 prior readings into Kimi K2.6's 256K context - so the oracle literally references where you've been.
 
 *Fair use*
-  Public users get 3 readings/day and 10 lifetime (anti-abuse — protects the dev's API budget). DM the dev for an invite to lift the cap. Owner is unlimited.
+  Public users get 3 readings/day and 10 lifetime (anti-abuse - protects the dev's API budget). DM the dev for an invite to lift the cap. Owner is unlimited.
 
 _For reflection, not prescription._
 """
@@ -213,16 +215,27 @@ def _owner_default_wallet() -> str:
         return ""
 
 
-def _reading_keyboard(user_id: int, reading_id: str) -> InlineKeyboardMarkup:
-    """Mint is now public — gated by per-user lifetime quota in ratelimit.can_mint()."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔮 Mint hero card on-chain",
-                              callback_data=f"mint:{reading_id}:0")],
-        [
-            InlineKeyboardButton("🪞 Pull again", callback_data="pull_again"),
-            InlineKeyboardButton("📅 Daily at 9 AM UTC", callback_data="schedule_daily"),
-        ],
-    ])
+def _reading_keyboard(user_id: int, reading_id: str,
+                       cards: list[dict] | None = None) -> InlineKeyboardMarkup:
+    """One mint button per card (user picks which resonates), plus Pull-again.
+
+    For a 3-card spread the user sees three vertically-stacked options like
+    'Mint Past: The Tower'. They can mint at most their lifetime quota
+    (1 for public, 5 for allowlist, unlimited for owner).
+    """
+    rows: list[list[InlineKeyboardButton]] = []
+    if cards:
+        for i, c in enumerate(cards):
+            pos = (c.get("position") or "").title()
+            name = c.get("name", "card")
+            label = f"🔮 Mint {pos}: {name}" if pos and pos != "The Card" else f"🔮 Mint {name}"
+            rows.append([InlineKeyboardButton(label, callback_data=f"mint:{reading_id}:{i}")])
+    else:
+        # Backwards-compat: pre-cards-aware callers get a single button to card 0.
+        rows.append([InlineKeyboardButton("🔮 Mint hero card on-chain",
+                                          callback_data=f"mint:{reading_id}:0")])
+    rows.append([InlineKeyboardButton("🪞 Pull again", callback_data="pull_again")])
+    return InlineKeyboardMarkup(rows)
 
 
 def _signs_inline_keyboard(prefix: str) -> InlineKeyboardMarkup:
@@ -347,7 +360,7 @@ async def _onb_next_after_city(update: Update, ctx: ContextTypes.DEFAULT_TYPE, u
     is_owner = cfg.is_owner(user_id)
     msg = ("*Step 3 of 3.* Which wallet should receive your minted NFT cards?\n\n"
            "_You can mint one card on Base Sepolia (free testnet). Paste your wallet "
-           "or skip — you can always set it later with `/profile wallet 0x…`._")
+           "or skip - you can always set it later with `/profile wallet 0x…`._")
     await ctx.bot.send_message(
         chat_id, msg, parse_mode=ParseMode.MARKDOWN,
         reply_markup=_wallet_keyboard(owner=is_owner),
@@ -371,7 +384,7 @@ async def onb_pick_wallet(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int
                                     parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
         return ConversationHandler.END
     if payload == "_skip":
-        await query.edit_message_text("⏭  Wallet skipped — set it later with `/profile wallet 0x…`",
+        await query.edit_message_text("⏭  Wallet skipped - set it later with `/profile wallet 0x…`",
                                        parse_mode=ParseMode.MARKDOWN)
         await ctx.bot.send_message(query.message.chat_id, _onb_done_text(user_id),
                                     parse_mode=ParseMode.MARKDOWN, reply_markup=MAIN_KB)
@@ -502,7 +515,7 @@ async def _do_reading(
     await ctx.bot.send_message(
         chat_id=chat_id,
         text=interpretation,
-        reply_markup=_reading_keyboard(user_id, reading.id),
+        reply_markup=_reading_keyboard(user_id, reading.id, cards=rendered),
     )
 
 
@@ -537,8 +550,10 @@ async def btn_single(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def _ask_question(update: Update, prefix: str, state: int) -> int:
     await update.message.reply_text(
-        f"{prefix}\n\nWhat question are you bringing to the cards?\n"
-        "_Type it freely. /cancel to abort._",
+        f"{prefix}\n\n"
+        "What question are you bringing to the cards?\n"
+        "_Type it freely._\n"
+        "_Or /cancel to abort._",
         parse_mode=ParseMode.MARKDOWN,
     )
     return state
@@ -623,7 +638,18 @@ async def _send_horoscope(update, ctx, user_id: int, sign: str) -> None:
         await ctx.bot.send_message(chat_id, f"The Oracle stumbled.\n{_safe_err(e)}")
         return
     commit_read(user_id)
-    await ctx.bot.send_message(chat_id, f"☀️ *{sign} — today*\n\n{text}", parse_mode=ParseMode.MARKDOWN)
+    # Send the horoscope itself as plain text (Kimi prose can include markdown chars).
+    await ctx.bot.send_message(chat_id, f"☀️ {sign} today\n\n{text}")
+    # CTA to subscribe to daily, but only if no daily job already exists for this user.
+    has_job = ctx.job_queue and bool(ctx.job_queue.get_jobs_by_name(f"daily-{user_id}"))
+    if not has_job:
+        await ctx.bot.send_message(
+            chat_id,
+            "Want this every morning?",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("📅 Daily at 9 AM UTC", callback_data="schedule_daily"),
+            ]]),
+        )
 
 
 # ----------------------------------------------------------------------
@@ -676,7 +702,7 @@ async def cmd_history(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     for r in rs:
         ts = time.strftime("%Y-%m-%d", time.gmtime(r.timestamp))
         cards = ", ".join(c["name"] for c in r.cards)
-        lines.append(f"`{ts}` — _{r.question[:60]}_\n      {cards}\n")
+        lines.append(f"`{ts}` - _{r.question[:60]}_\n      {cards}\n")
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.MARKDOWN)
 
 
@@ -686,7 +712,7 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     g = todays_spend()
     msg = (
-        f"*{BRAND} — status*\n"
+        f"*{BRAND} - status*\n"
         f"Today's spend: ${g.spent_usd:.4f} / ${cfg.max_daily_usd_spend}\n"
         f"Breakdown: {g.breakdown}\n"
         f"Public enabled: {cfg.public_enabled}\n"
@@ -704,7 +730,7 @@ async def cmd_status(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def on_free_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """A user message NOT inside any conversation and NOT matching a button.
     Two cases:
-      1) A pending mint is awaiting the user's wallet — accept it and mint.
+      1) A pending mint is awaiting the user's wallet - accept it and mint.
       2) Otherwise treat the text as a tarot question (3-card spread)."""
     if not update.message or not update.message.text:
         return
@@ -809,7 +835,7 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                     media.append(InputMediaPhoto(media=data_b))
             await ctx.bot.send_media_group(msg.chat_id, media=media)
             await ctx.bot.send_message(msg.chat_id, interpretation,
-                                       reply_markup=_reading_keyboard(user_id, r.id))
+                                       reply_markup=_reading_keyboard(user_id, r.id, cards=rendered))
         except Exception as e:  # noqa: BLE001
             log.exception("pull_again failed")
             await ctx.bot.send_message(msg.chat_id, f"The cards resist.\n{_safe_err(e)}")
@@ -853,7 +879,7 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 "Paste a Base Sepolia (or any EVM) wallet address and I'll mint the card to it. "
                 "Must start with `0x` and be 42 characters.\n\n"
                 "_Don't have one? Create a fresh wallet in MetaMask, copy its address, paste here. "
-                "No funds needed for the mint — we cover the testnet gas._\n\n"
+                "No funds needed for the mint - we cover the testnet gas._\n\n"
                 "Or send /cancel to abort.",
                 parse_mode=ParseMode.MARKDOWN)
             return
@@ -877,8 +903,7 @@ async def _job_daily_horoscope(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         log.exception("scheduled horoscope failed for %s", user_id)
         await ctx.bot.send_message(chat_id, f"Today's horoscope stumbled.\n{_safe_err(e)}")
         return
-    await ctx.bot.send_message(chat_id, f"☀️ *{sign} — today*\n\n{text}",
-                                parse_mode=ParseMode.MARKDOWN)
+    await ctx.bot.send_message(chat_id, f"☀️ {sign} today\n\n{text}")
 
 
 # ----------------------------------------------------------------------
@@ -905,7 +930,7 @@ async def _post_init(app: Application) -> None:
     try:
         await app.bot.set_my_commands(COMMANDS_MENU, scope=BotCommandScopeAllPrivateChats())
         await app.bot.set_my_short_description(
-            f"{BRAND} — {TAGLINE}. Powered by Hermes Agent + Kimi K2.6."
+            f"{BRAND} - {TAGLINE}. Powered by Hermes Agent + Kimi K2.6."
         )
         await app.bot.set_my_description(
             f"🪞 {BRAND}\n\n"
@@ -925,7 +950,7 @@ def build_app() -> Application:
     app = ApplicationBuilder().token(cfg.telegram_bot_token).post_init(_post_init).build()
     app.add_error_handler(_on_error)
 
-    # 1) Onboarding — only fires for first-time /start
+    # 1) Onboarding - only fires for first-time /start
     onboarding = ConversationHandler(
         entry_points=[CommandHandler("start", cmd_start)],
         states={
