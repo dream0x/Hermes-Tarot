@@ -938,7 +938,7 @@ async def _post_init(app: Application) -> None:
             f"{TAGLINE.capitalize()}.\n\n"
             "Send a question and the cards will answer. Built for the Hermes Agent "
             "Creative Hackathon (Nous Research × Kimi).\n\n"
-            "github.com/dream0x/Mnemos"
+            "github.com/doxe0x/Mnemos"
         )
         log.info("BotCommands + descriptions registered")
     except Exception:  # noqa: BLE001

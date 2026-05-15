@@ -8,7 +8,7 @@ description: |
   the hero card of a reading as an ERC-721 NFT on Base Sepolia.
 author: Mnemos contributors
 license: MIT
-homepage: https://github.com/dream0x/Mnemos
+homepage: https://github.com/doxe0x/Mnemos
 runtime: python>=3.10
 ---
 
