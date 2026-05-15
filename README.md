@@ -4,14 +4,11 @@
 
 A divination companion built as a [Hermes Agent](https://hermes-agent.nousresearch.com/) skill. Mnemos pulls tarot spreads, paints the cards in a unified deck style with FLUX, and answers your question through them with **Kimi K2.6's 256K context** - using the entire history of readings it's ever given you. The hero card of each reading can be minted on **Base Sepolia** as an ERC-721 keepsake, viewable through a custom on-chain viewer.
 
-> **Try it live:** [@mnemos_oracle_bot](https://t.me/mnemos_oracle_bot) on Telegram
 > **View any minted card:** [the on-chain viewer](https://dream0x.github.io/Mnemos/?contract=0xa1b9bdeb72aa4f4b86c11234ea6301daa68d2c16&token=1)
->
-> Public users get 3 readings/day (anti-abuse). Owner has unlimited use and minting.
 
 Built for the [**Hermes Agent Creative Hackathon**](https://hermes-agent.nousresearch.com/) by [Nous Research](https://nousresearch.com/) × [Kimi (Moonshot AI)](https://www.kimi.com/), May 2026.
 
-> **Status (May 2026, post-hackathon):** Submission complete. Bot is still live, real readings keep happening, code stays open. If the live bot goes offline later, you can self-host with your own API keys in ~10 min (see Setup below).
+> **Status (post-hackathon):** Project is paused. The Telegram bot has been stopped and all API keys rotated. The code stays open and is fully reproducible: clone, fill your own API keys in `.env`, and run (see Setup below).
 
 ---
 
@@ -168,7 +165,7 @@ Mnemos is structured as a first-class **Hermes Agent skill**, not a standalone a
 
 The Telegram bot in `bot.py` is just *one* transport that calls these tools. The same module, dropped into a Hermes-with-Discord install, works untouched.
 
-**3. The persistent-memory pattern** is Hermes' signature feature, and Mnemos leans into it hard. Hermes itself uses `~/.hermes/MEMORY.md` + `~/.hermes/USER.md` for global agent memory. Mnemos adds *skill-scoped* memory underneath: per-user JSONL files at `data/{telegram_user_id}/readings.jsonl` plus `profile.json`. Every reading is appended; every new reading reads the tail back into the prompt. Hermes' built-in scheduler is what powers the daily-horoscope cron — when the user taps `📅 Daily at 9 AM UTC`, we register a recurring job whose handler simply calls `oracle.daily_horoscope()` and DM's the result. No custom cron service needed.
+**3. The persistent-memory pattern** is Hermes' signature feature, and Mnemos leans into it hard. Hermes itself uses `~/.hermes/MEMORY.md` + `~/.hermes/USER.md` for global agent memory. Mnemos adds *skill-scoped* memory underneath: per-user JSONL files at `data/{telegram_user_id}/readings.jsonl` plus `profile.json`. Every reading is appended; every new reading reads the tail back into the prompt. Hermes' built-in scheduler is what powers the daily-horoscope cron - when the user taps `📅 Daily at 9 AM UTC`, we register a recurring job whose handler simply calls `oracle.daily_horoscope()` and DM's the result. No custom cron service needed.
 
 > The result: Mnemos is the kind of skill that actually *grows with you*. The same skill instance, used over weeks, references your real history. That's a Hermes-shaped product, not a one-shot LLM call dressed up.
 
@@ -187,7 +184,7 @@ Kimi K2.6 (Moonshot AI's 1T-parameter MoE) is the **interpretation engine**. We 
 
 That's typically 5-20K input tokens, well under the 256K ceiling. The result: Mnemos can naturally reference last week's pull ("the Magician walked behind you then; the Tower turning now is its echo") without any retrieval-augmentation pipeline. We just put the history in the context, and Kimi notices what matters.
 
-**2. `thinking: disabled` for warm immediate prose.** K2.6 ships with a "thinking" reasoning mode that emits chain-of-thought tokens to a separate field. For a divination tone we want the *first* response to be the final response — no inner monologue, no scaffolding, no apologetic preamble. We pass `extra_body={"thinking": {"type": "disabled"}}` on every chat completion (see `kimi.py::_chat`). This roughly halves latency too.
+**2. `thinking: disabled` for warm immediate prose.** K2.6 ships with a "thinking" reasoning mode that emits chain-of-thought tokens to a separate field. For a divination tone we want the *first* response to be the final response - no inner monologue, no scaffolding, no apologetic preamble. We pass `extra_body={"thinking": {"type": "disabled"}}` on every chat completion (see `kimi.py::_chat`). This roughly halves latency too.
 
 **3. A locked output shape with belt-and-suspenders.** The system prompt enforces a strict 4-paragraph form: *frame the question → cards as direct answer → concrete direction → close on a body image*, plus a one-line italic disclaimer. It also explicitly forbids em-dashes (a model tic) and lists 8 phrases to never use ("I sense", "trust your gut", etc.). On top of that, `kimi.py::_strip_dashes` post-processes every response to replace any em/en-dash that slips through with a comma or hyphen. The output is reliably plain prose ready to ship straight to Telegram.
 
@@ -204,31 +201,18 @@ That's typically 5-20K input tokens, well under the 256K ceiling. The result: Mn
 
 ---
 
-## Roadmap (post-hackathon v0.3)
-- Live **x402** paid premium readings (autonomous USDC microtransactions per spread)
-- Autonomous mint per reading (every spread auto-mints as a private NFT keepsake)
-- Run on a real **Hermes Agent runtime** (current production is `bot.py` calling `oracle.py` directly; the SKILL.md surface is ready, just needs the agent installed alongside)
-- Discord & WhatsApp deployments
-- Voice replies via TTS
-- More spreads (Celtic Cross, Year-Ahead, Career Cross)
-- Astrology natal chart rendering (skyfield is already in deps)
-- Persistent JobQueue (currently in-memory, daily horoscopes are lost on restart)
-- Optional opt-in "predictions tracked" - Mnemos revisits old readings and asks if they came true
-
----
-
 ## What I learned building this
 
 A few things that surprised me and might help anyone else building on top:
 
-- **Kimi K2.6's 256K context is *the* product mechanic, not a footnote.** Once you put 30 prior readings into every prompt, the model naturally weaves callbacks ("the Magician walked behind you last week — that cycle is closing"). No retrieval, no embeddings, no vector DB. Just full conversation history. A wrapper-style "tarot bot" would never get this texture.
-- **FLUX [dev] still hallucinates titles on cards.** Even with strong negative prompts. The fix is `Pillow` overlaying the real card name in EB Garamond on top of the bottom band — clean, fast, free. Style locking happens through a single shared `DECK_STYLE` prompt + per-card art fragment.
-- **OpenSea retired all testnets** in 2025, so for a hackathon NFT mint you now need a custom viewer. The `docs/index.html` is one HTML file that reads the contract via Base Sepolia RPC and pulls metadata from IPFS — works in any browser, no backend.
+- **Kimi K2.6's 256K context is *the* product mechanic, not a footnote.** Once you put 30 prior readings into every prompt, the model naturally weaves callbacks ("the Magician walked behind you last week - that cycle is closing"). No retrieval, no embeddings, no vector DB. Just full conversation history. A wrapper-style "tarot bot" would never get this texture.
+- **FLUX [dev] still hallucinates titles on cards.** Even with strong negative prompts. The fix is `Pillow` overlaying the real card name in EB Garamond on top of the bottom band - clean, fast, free. Style locking happens through a single shared `DECK_STYLE` prompt + per-card art fragment.
+- **OpenSea retired all testnets** in 2025, so for a hackathon NFT mint you now need a custom viewer. The `docs/index.html` is one HTML file that reads the contract via Base Sepolia RPC and pulls metadata from IPFS - works in any browser, no backend.
 - **Telegram's `ReplyKeyboardMarkup` beats `InlineKeyboard` for primary navigation.** Persistent buttons at the bottom are way more discoverable than slash commands or inline-only flows.
 - **`fcntl.flock` for state files matters even at 10 users.** With `asyncio.to_thread` plus concurrent readings, two parallel updates to `quota.json` or `readings.jsonl` can lose data. Cheap fix, big robustness win.
-- **Don't trust a price constant you derived once.** Mid-hackathon code audit found that the Kimi cost tracker was off by 1000× — the `$5/day` ceiling would only have triggered at $5000 of real spend. Lesson: write a sanity unit test that asserts "one typical reading costs ~$X".
+- **Don't trust a price constant you derived once.** Mid-hackathon code audit found that the Kimi cost tracker was off by 1000× - the `$5/day` ceiling would only have triggered at $5000 of real spend. Lesson: write a sanity unit test that asserts "one typical reading costs ~$X".
 
 ---
 
 ## License
-MIT - see `LICENSE`. If the live public bot ever goes offline, this repo is fully reproducible — clone, copy `.env.example` to `.env`, fill your own API keys, and run.
+MIT - see `LICENSE`. If the live public bot ever goes offline, this repo is fully reproducible - clone, copy `.env.example` to `.env`, fill your own API keys, and run.
